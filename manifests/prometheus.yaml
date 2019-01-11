@@ -1,0 +1,13 @@
+apiVersion: prometheus.io
+kind: Prometheus
+metadata:
+  namespaces: prometheus
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  initImage: "busybox:latest"
+  imagePullPolicy: "IfNotPresent"
+  reloadImage:  "jimmidyson/configmap-reload:v0.1"
+  image: "prom/prometheus:v2.2.1"
