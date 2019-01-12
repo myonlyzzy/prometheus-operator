@@ -134,6 +134,7 @@ func (p *PrometheusController) sync(key string) error {
 		klog.Infof("Prometheus has been deleted %v", key)
 		return nil
 	}
+	klog.Infof("sync prometheus %v\n ", prometheus)
 	if err := p.syncService(prometheus); err != nil {
 		return err
 	}
@@ -262,15 +263,15 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 			MountPath: "/data",
 		},
 	}
-	var probe *corev1.Probe
-	probe.Handler = corev1.Handler{
-		HTTPGet: &corev1.HTTPGetAction{
-			Path: "/-/ready",
-			Port: intstr.FromInt(9090),
-		},
-	}
-	probe.InitialDelaySeconds = 30
-	probe.TimeoutSeconds = 30
+	/*	var probe =&corev1.Probe{}
+		probe.Handler = corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/-/ready",
+				Port: intstr.FromInt(9090),
+			},
+		}*/
+	/*	probe.InitialDelaySeconds = 30
+		probe.TimeoutSeconds = 30*/
 	var volume corev1.Volume
 	volume.ConfigMap.Name = "prometheus-config"
 	volume.Name = "config-volume"
@@ -338,10 +339,10 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 								ContainerPort: 9090,
 							},
 						},
-						Resources:      NewContainerResourceRequirements("200m", "200m", "1000Mi", "1000Mi"),
-						VolumeMounts:   prometheusVolumeMounts,
-						LivenessProbe:  probe,
-						ReadinessProbe: probe,
+						Resources:    NewContainerResourceRequirements("200m", "200m", "1000Mi", "1000Mi"),
+						VolumeMounts: prometheusVolumeMounts,
+						//LivenessProbe:  probe,
+						//ReadinessProbe: probe,
 					},
 				},
 				Volumes: []corev1.Volume{

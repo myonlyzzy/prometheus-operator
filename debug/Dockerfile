@@ -5,8 +5,10 @@ ENV CGO_ENABLED 0
 RUN apk add --no-cache git
 
 #compile prometheus-operator
-RUN go get  github.com/myonlyzzy/prometheus-operator
-RUN go build -gcflags "all=-N -l" -o /prometheus-operator  /go/src/github.com/myonlyzzy/prometheus-operator/cmd/prometheus-operator
+RUN mkdir -p /go/src/github.com/myonlyzzy/
+RUN git clone https://github.com/myonlyzzy/prometheus-operator /go/src/github.com/myonlyzzy/prometheus-operator
+
+RUN go build -gcflags "all=-N -l" -o /prometheus-operator  /go/src/github.com/myonlyzzy/prometheus-operator/cmd/prometheus-operator/prometheus-operator.go
 
 #compile dlv
 RUN go get github.com/derekparker/delve/cmd/dlv
