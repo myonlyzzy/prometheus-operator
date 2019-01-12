@@ -151,6 +151,8 @@ k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/util/mergepatch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/pkg/apis/meta/internalversion
+# k8s.io/apiserver v0.0.0-20190111235401-dc8ef36b83d1
+k8s.io/apiserver/pkg/util/logs
 # k8s.io/client-go v10.0.0+incompatible
 k8s.io/client-go/informers
 k8s.io/client-go/kubernetes

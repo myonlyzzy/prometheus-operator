@@ -10,8 +10,8 @@ import corev1 "k8s.io/api/core/v1"
 type Prometheus struct {
 	v1.TypeMeta   `json:",inline"`
 	v1.ObjectMeta `json:"metadata",omitempty`
-	Spec          PrometheusSpec   `json:"spec"`
-	Status        PrometheusStatus `json:"status omitempty"`
+	Spec          PrometheusSpec    `json:"spec"`
+	Status        *PrometheusStatus `json:"status omitempty"`
 }
 
 // Prometheus Spec

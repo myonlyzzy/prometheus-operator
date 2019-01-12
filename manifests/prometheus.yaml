@@ -1,4 +1,4 @@
-apiVersion: prometheus.io
+apiVersion: prometheus.io/v1alpha1
 kind: Prometheus
 metadata:
   namespaces: prometheus
@@ -11,3 +11,4 @@ spec:
   imagePullPolicy: "IfNotPresent"
   reloadImage:  "jimmidyson/configmap-reload:v0.1"
   image: "prom/prometheus:v2.2.1"
+status:

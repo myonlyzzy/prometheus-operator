@@ -44,8 +44,6 @@ type PrometheusController struct {
 	prometheusSynced cache.InformerSynced
 }
 
-
-
 //NewPrometheusController return a Prometheus controller
 func NewPrometheusController(client kubernetes.Interface, clientset versioned.Interface, setInformer appsinformers.StatefulSetInformer, svcInformers coreinformers.ServiceInformer, prometheusInformer pv1alpha1.PrometheusInformer) *PrometheusController {
 
@@ -68,6 +66,7 @@ func NewPrometheusController(client kubernetes.Interface, clientset versioned.In
 	prometheusInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.enqueue,
 	})
+
 	return p
 
 }
@@ -82,7 +81,7 @@ func (p *PrometheusController) Run(workers int, stopCh <-chan struct{}) {
 	}
 	klog.Info("Starting workers")
 	for i := 0; i < workers; i++ {
-		go wait.Until(p.Worker, time.Second, stopCh)
+		go wait.Until(p.Worker, 10*time.Second, stopCh)
 	}
 	klog.Info("Started workers")
 	<-stopCh
@@ -182,9 +181,9 @@ func (p *PrometheusController) CreateService(prometheus *v1alpha1.Prometheus) er
 		return err
 	}
 	if err != nil {
-		p.recorder.Event(prometheus, corev1.EventTypeNormal, "success", fmt.Sprintln("Successful create prometheus service "))
+		p.recorder.Event(prometheus, corev1.EventTypeNormal, "failed", fmt.Sprintln("Create prometheus service failed "))
 	} else {
-		p.recorder.Event(prometheus, corev1.EventTypeWarning, "failed", fmt.Sprintln(" Create prometheus service failed "))
+		p.recorder.Event(prometheus, corev1.EventTypeWarning, "success", fmt.Sprintln(" Successful create prometheus service"))
 	}
 	return err
 }
@@ -373,7 +372,7 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 	return set
 }
 
-func NewContainerResourceRequirements(cpuLimit, cpuRequest, memLimit, memRequest string, ) corev1.ResourceRequirements {
+func NewContainerResourceRequirements(cpuLimit, cpuRequest, memLimit, memRequest string) corev1.ResourceRequirements {
 	r := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(cpuLimit),
