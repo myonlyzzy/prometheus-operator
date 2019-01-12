@@ -6,9 +6,21 @@ metadata:
   labels:
     app: prometheus
 spec:
-  replicas: 1
-  initImage: "busybox:latest"
-  imagePullPolicy: "IfNotPresent"
-  reloadImage:  "jimmidyson/configmap-reload:v0.1"
-  image: "prom/prometheus:v2.2.1"
+  statefulset:
+    replicas: 1
+    initImage: "busybox:latest"
+    imagePullPolicy: "IfNotPresent"
+    reloadImage:  "jimmidyson/configmap-reload:v0.1"
+    image: "prom/prometheus:v2.2.1"
+    storage:
+      volumeClaimTemplates:
+      - metadata:
+          name: prometheus-data
+        spec:
+          storageClassName: local-storage
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: "16Gi"
 status:

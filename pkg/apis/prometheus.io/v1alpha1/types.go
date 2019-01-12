@@ -16,11 +16,24 @@ type Prometheus struct {
 
 // Prometheus Spec
 type PrometheusSpec struct {
-	Replicas        int32             `json:""replicas`
-	PrometheusImage string            `json:"image"`
-	InitImage       string            `json:"initImage"`
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitemtpy"`
-	ReloadImage     string            `json:"reloadImage"`
+	StatefulSet *PrometheusStatefulSet `json:"statefulset"`
+	Status      *PrometheusStatus      `json:"status omitempty"`
+}
+
+// Prometheus Statefulset
+type PrometheusStatefulSet struct {
+	Replicas        *int32             `json:""replicas`
+	PrometheusImage string             `json:"image"`
+	InitImage       string             `json:"initImage"`
+	ImagePullPolicy corev1.PullPolicy  `json:"imagePullPolicy,omitempty"`
+	ReloadImage     string             `json:"reloadImage"`
+	Storage         *PrometheusStorage `json:storage`
+}
+
+// Prometheus StorageClass
+
+type PrometheusStorage struct {
+	VolumeClaimTemplate corev1.PersistentVolumeClaim `json:volumeClaimTemplate`
 }
 
 //Prometheus Status

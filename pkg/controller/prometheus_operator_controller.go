@@ -134,6 +134,7 @@ func (p *PrometheusController) sync(key string) error {
 		klog.Infof("Prometheus has been deleted %v", key)
 		return nil
 	}
+
 	klog.Infof("sync prometheus %v\n ", prometheus)
 	if err := p.syncService(prometheus); err != nil {
 		return err
@@ -163,15 +164,25 @@ func (p *PrometheusController) syncService(prometheus *v1alpha1.Prometheus) erro
 func (p *PrometheusController) syncStatefulSet(prometheus *v1alpha1.Prometheus) error {
 	namespace := prometheus.GetNamespace()
 	name := prometheus.GetName()
+	if prometheus.Spec.StatefulSet == nil {
+		if err := p.client.AppsV1().StatefulSets(namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
 	_, err := p.setLister.StatefulSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		err := p.CreateStatefulset(prometheus)
 		if err != nil {
 			return err
 		}
-
 	}
+
 	return err
+}
+
+//update prometheus statefulset
+func (p *PrometheusController) UpdateStatefulSet(prometheus *v1alpha1.Prometheus) {
+
 }
 
 func (p *PrometheusController) CreateService(prometheus *v1alpha1.Prometheus) error {
@@ -276,7 +287,7 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 	volume.ConfigMap = &corev1.ConfigMapVolumeSource{}
 	volume.ConfigMap.Name = "prometheus-config"
 	volume.Name = "config-volume"
-	pvc := corev1.PersistentVolumeClaim{
+	/*	pvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "prometheus-data",
 		},
@@ -291,10 +302,10 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 				},
 			},
 		},
-	}
+	}*/
 	setSpec := appsv1.StatefulSetSpec{
 		ServiceName: prometheus.Name,
-		Replicas:    func() *int32 { r := prometheus.Spec.Replicas; return &r }(),
+		Replicas:    prometheus.Spec.StatefulSet.Replicas,
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{"app": "prometheus"},
 		},
@@ -306,8 +317,8 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 				InitContainers: []corev1.Container{
 					corev1.Container{
 						Name:            "init-chown-data",
-						Image:           prometheus.Spec.InitImage,
-						ImagePullPolicy: prometheus.Spec.ImagePullPolicy,
+						Image:           prometheus.Spec.StatefulSet.InitImage,
+						ImagePullPolicy: prometheus.Spec.StatefulSet.ImagePullPolicy,
 						Command:         []string{"chown", "-R", "65534:65534", "/data"},
 						VolumeMounts:    initVolumeMounts,
 					},
@@ -315,8 +326,8 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 				Containers: []corev1.Container{
 					corev1.Container{
 						Name:            "prometheus-server-configmap-reload",
-						Image:           prometheus.Spec.ReloadImage,
-						ImagePullPolicy: prometheus.Spec.ImagePullPolicy,
+						Image:           prometheus.Spec.StatefulSet.ReloadImage,
+						ImagePullPolicy: prometheus.Spec.StatefulSet.ImagePullPolicy,
 						Args: []string{
 							"--volume-dir=/etc/config",
 							"--webhook-url=http://localhost:9090/-/reload",
@@ -326,8 +337,8 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 					},
 					corev1.Container{
 						Name:            "prometheus-server",
-						ImagePullPolicy: prometheus.Spec.ImagePullPolicy,
-						Image:           prometheus.Spec.PrometheusImage,
+						ImagePullPolicy: prometheus.Spec.StatefulSet.ImagePullPolicy,
+						Image:           prometheus.Spec.StatefulSet.PrometheusImage,
 						Args: []string{
 							"--config.file=/etc/config/prometheus.yml",
 							"--storage.tsdb.path=/data",
@@ -352,7 +363,7 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 			},
 		},
 		VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-			pvc,
+			prometheus.Spec.StatefulSet.Storage.VolumeClaimTemplate,
 		},
 	}
 	set := &appsv1.StatefulSet{
