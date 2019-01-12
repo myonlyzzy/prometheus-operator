@@ -263,16 +263,17 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 			MountPath: "/data",
 		},
 	}
-	/*	var probe =&corev1.Probe{}
-		probe.Handler = corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/-/ready",
-				Port: intstr.FromInt(9090),
-			},
-		}*/
-	/*	probe.InitialDelaySeconds = 30
-		probe.TimeoutSeconds = 30*/
+	var probe = &corev1.Probe{}
+	probe.Handler = corev1.Handler{
+		HTTPGet: &corev1.HTTPGetAction{
+			Path: "/-/ready",
+			Port: intstr.FromInt(9090),
+		},
+	}
+	probe.InitialDelaySeconds = 30
+	probe.TimeoutSeconds = 30
 	var volume corev1.Volume
+	volume.ConfigMap = &corev1.ConfigMapVolumeSource{}
 	volume.ConfigMap.Name = "prometheus-config"
 	volume.Name = "config-volume"
 	pvc := corev1.PersistentVolumeClaim{
@@ -339,10 +340,10 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 								ContainerPort: 9090,
 							},
 						},
-						Resources:    NewContainerResourceRequirements("200m", "200m", "1000Mi", "1000Mi"),
-						VolumeMounts: prometheusVolumeMounts,
-						//LivenessProbe:  probe,
-						//ReadinessProbe: probe,
+						Resources:      NewContainerResourceRequirements("200m", "200m", "1000Mi", "1000Mi"),
+						VolumeMounts:   prometheusVolumeMounts,
+						LivenessProbe:  probe,
+						ReadinessProbe: probe,
 					},
 				},
 				Volumes: []corev1.Volume{
