@@ -123,10 +123,10 @@ func (in *PrometheusStatefulSet) DeepCopyInto(out *PrometheusStatefulSet) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.Storage != nil {
-		in, out := &in.Storage, &out.Storage
-		*out = new(PrometheusStorage)
-		(*in).DeepCopyInto(*out)
+	if in.StorageClassName != nil {
+		in, out := &in.StorageClassName, &out.StorageClassName
+		*out = new(string)
+		**out = **in
 	}
 	return
 }

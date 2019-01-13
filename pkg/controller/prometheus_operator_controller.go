@@ -64,7 +64,8 @@ func NewPrometheusController(client kubernetes.Interface, clientset versioned.In
 	}
 
 	prometheusInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.enqueue,
+		AddFunc:    p.addPrometheus,
+		DeleteFunc: p.deletePromethues,
 	})
 
 	return p
@@ -81,7 +82,7 @@ func (p *PrometheusController) Run(workers int, stopCh <-chan struct{}) {
 	}
 	klog.Info("Starting workers")
 	for i := 0; i < workers; i++ {
-		go wait.Until(p.Worker, 10*time.Second, stopCh)
+		go wait.Until(p.Worker, time.Second, stopCh)
 	}
 	klog.Info("Started workers")
 	<-stopCh
@@ -108,19 +109,29 @@ func (p *PrometheusController) processNextWorkItem() bool {
 	return true
 }
 
-//convert a prometheus resource to namespace/name and  add to workqueue
+//convert a prometheus resource to namespace/name then  add to workqueue
 func (p *PrometheusController) enqueue(obj interface{}) {
 	var key string
 	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+
+	if key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err != nil {
 		utilruntime.HandleError(err)
 		return
 	}
 	p.workqueue.AddRateLimited(key)
 }
 
+func (p *PrometheusController) deletePromethues(obj interface{}) {
+	p.enqueue(obj)
+}
+
+func (p *PrometheusController) addPrometheus(obj interface{}) {
+	p.enqueue(obj)
+}
+
 //sync prometheus reource
 func (p *PrometheusController) sync(key string) error {
+
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing prometheus %q (%v)", key, time.Since(startTime))
@@ -129,26 +140,27 @@ func (p *PrometheusController) sync(key string) error {
 	if err != nil {
 		return err
 	}
+	klog.Infof("sync prometheus %v", name)
 	prometheus, err := p.prometheusLister.Prometheuses(namespace).Get(name)
+	prom := prometheus.DeepCopy()
 	if errors.IsNotFound(err) {
 		klog.Infof("Prometheus has been deleted %v", key)
 		return nil
 	}
-
-	klog.Infof("sync prometheus %v\n ", prometheus)
-	if err := p.syncService(prometheus); err != nil {
+	if err := p.syncService(prom); err != nil {
 		return err
 	}
-	if err := p.syncStatefulSet(prometheus); err != nil {
+	if err := p.syncStatefulSet(prom); err != nil {
 		return err
 	}
 	return nil
 }
 
-//sync  service
+//sync  prometheus service
 func (p *PrometheusController) syncService(prometheus *v1alpha1.Prometheus) error {
 	namespace := prometheus.GetNamespace()
 	name := prometheus.GetName()
+	klog.Infof("sync prometheus service %v", name)
 	_, err := p.svcLister.Services(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		err := p.CreateService(prometheus)
@@ -160,10 +172,11 @@ func (p *PrometheusController) syncService(prometheus *v1alpha1.Prometheus) erro
 	return err
 }
 
-//sync  statefulset
+//sync prometheus statefulset
 func (p *PrometheusController) syncStatefulSet(prometheus *v1alpha1.Prometheus) error {
 	namespace := prometheus.GetNamespace()
 	name := prometheus.GetName()
+	klog.Infof("sync prometheus statefulset %v", name)
 	if prometheus.Spec.StatefulSet == nil {
 		if err := p.client.AppsV1().StatefulSets(namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
 			return err
@@ -182,9 +195,10 @@ func (p *PrometheusController) syncStatefulSet(prometheus *v1alpha1.Prometheus) 
 
 //update prometheus statefulset
 func (p *PrometheusController) UpdateStatefulSet(prometheus *v1alpha1.Prometheus) {
-
+	// TODO
 }
 
+//create prometheus service into k8s
 func (p *PrometheusController) CreateService(prometheus *v1alpha1.Prometheus) error {
 	nameSpace := prometheus.GetNamespace()
 	svc := p.NewPrometheusService(prometheus)
@@ -199,6 +213,8 @@ func (p *PrometheusController) CreateService(prometheus *v1alpha1.Prometheus) er
 	}
 	return err
 }
+
+//create prometheus statefulset into k8s
 func (p *PrometheusController) CreateStatefulset(prometheus *v1alpha1.Prometheus) error {
 	nameSpace := prometheus.GetNamespace()
 	set := p.NewPrometheusStatefulSet(prometheus)
@@ -214,6 +230,7 @@ func (p *PrometheusController) CreateStatefulset(prometheus *v1alpha1.Prometheus
 	return err
 }
 
+//new prometheus service object
 func (p *PrometheusController) NewPrometheusService(prometheus *v1alpha1.Prometheus) *corev1.Service {
 	labels := make(map[string]string)
 	labels["app"] = "prometheus"
@@ -249,6 +266,8 @@ func (p *PrometheusController) NewPrometheusService(prometheus *v1alpha1.Prometh
 	}
 	return svc
 }
+
+//new prometheus statefulset object
 func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Prometheus) *appsv1.StatefulSet {
 	labels := map[string]string{"app": "prometheus"}
 	initVolumeMounts := []corev1.VolumeMount{
@@ -283,26 +302,12 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 	}
 	probe.InitialDelaySeconds = 30
 	probe.TimeoutSeconds = 30
-	var volume corev1.Volume
+	var volume, emptyDir corev1.Volume
 	volume.ConfigMap = &corev1.ConfigMapVolumeSource{}
 	volume.ConfigMap.Name = "prometheus-config"
 	volume.Name = "config-volume"
-	/*	pvc := corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "prometheus-data",
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: func() *string { name := "standard"; return &name }(),
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.PersistentVolumeAccessMode(corev1.ReadWriteOnce),
-			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("16Gi"),
-				},
-			},
-		},
-	}*/
+	emptyDir.Name = "prometheus-data"
+	emptyDir.EmptyDir = &corev1.EmptyDirVolumeSource{}
 	setSpec := appsv1.StatefulSetSpec{
 		ServiceName: prometheus.Name,
 		Replicas:    prometheus.Spec.StatefulSet.Replicas,
@@ -359,11 +364,9 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 				},
 				Volumes: []corev1.Volume{
 					volume,
+					emptyDir,
 				},
 			},
-		},
-		VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-			prometheus.Spec.StatefulSet.Storage.VolumeClaimTemplate,
 		},
 	}
 	set := &appsv1.StatefulSet{
@@ -385,6 +388,7 @@ func (p *PrometheusController) NewPrometheusStatefulSet(prometheus *v1alpha1.Pro
 	return set
 }
 
+//new resourceRequirements object
 func NewContainerResourceRequirements(cpuLimit, cpuRequest, memLimit, memRequest string) corev1.ResourceRequirements {
 	r := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{

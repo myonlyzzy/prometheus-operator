@@ -24,6 +24,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - event
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
   - configmaps
   - secrets
   verbs:
@@ -100,12 +106,8 @@ spec:
     spec:
       containers:
       - name: prometheus-operator
-        image: myonlyzzy/prometheus-operator:1.1
+        image: myonlyzzy/prometheus-operator:latest
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/prometheus-operator
       serviceAccountName: prometheus-operator
-      securityContext:
-        capabilities:
-          add:
-            SYS_PTRACE
