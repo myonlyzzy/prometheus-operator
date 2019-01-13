@@ -67,9 +67,25 @@ func NewPrometheusController(client kubernetes.Interface, clientset versioned.In
 		AddFunc:    p.addPrometheus,
 		DeleteFunc: p.deletePromethues,
 	})
+	setInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		//AddFunc:   p.addStatefulSet,
+		DeleteFunc: p.deleteStatefulSet,
+	})
 
 	return p
 
+}
+
+//
+func (p *PrometheusController) addStatefulSet(obj interface{}) {
+	//TODO
+}
+
+// add a prometheus  obj to workqueque when statefulSet delete
+func (p *PrometheusController) deleteStatefulSet(obj interface{}) {
+	set := obj.(*appsv1.StatefulSet)
+	prometheus := p.GetPrometheusByStateful(set)
+	p.enqueue(prometheus)
 }
 
 func (p *PrometheusController) Run(workers int, stopCh <-chan struct{}) {
@@ -401,4 +417,25 @@ func NewContainerResourceRequirements(cpuLimit, cpuRequest, memLimit, memRequest
 		},
 	}
 	return r
+}
+
+func (p *PrometheusController) GetPrometheusByStateful(set *appsv1.StatefulSet) *v1alpha1.Prometheus {
+	controllerRef := metav1.GetControllerOf(set)
+	if controllerRef == nil {
+		return nil
+	}
+	nameSpace := set.GetNamespace()
+	prometheusKind := v1alpha1.SchemeGroupVersion.WithKind("prometheus")
+
+	if controllerRef.Kind != prometheusKind.Kind {
+		return nil
+	}
+	prometheus, err := p.prometheusLister.Prometheuses(nameSpace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if prometheus.UID != controllerRef.UID {
+		return nil
+	}
+	return prometheus
 }
